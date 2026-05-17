@@ -172,6 +172,20 @@ the full list.
 > pinning behaviour after a refactor, unrelated to time travel. The
 > time-travel recorder is `replay-record`.
 
+## Potential future work
+
+* **Loom transcript viewer.** When a `loom::model` test finds a failing
+  schedule, loom writes a checkpoint file (`LOOM_CHECKPOINT_FILE`) plus a
+  text trace of the offending interleaving. Today the user reads the
+  text and reasons about it by hand. A `bs loom <test>` mode would
+  re-run the test with the checkpoint loaded, attach BugStalker at the
+  failing assertion, and render the schedule as a timeline alongside the
+  variable view — every atomic load, every mutex acquire, every thread
+  preemption surfaced with source coordinates. Loom finds the bug; the
+  debugger makes it inspectable. Loom's other ideas worth borrowing:
+  DPOR for any future schedule-fuzz over a recorded trace, and the
+  happens-before tracker for an async wake-graph capture.
+
 ## Edit-and-continue (in progress)
 
 The AOT pipeline (cg_clif → wild → BugStalker patch-apply) lands working
