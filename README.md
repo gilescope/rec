@@ -64,10 +64,10 @@ support, DAP for VSCode and any DAP client.)
   counters; depth-bounded rendering and cycle detection so `Rc<Self>` graphs
   don't loop forever in the renderer.
 
-* **Time-travel debugging.** Tier-1 reverse step over a recorded trace,
-  Tier-2 ring-buffered fork checkpoints, Tier-3 deterministic
-  record-and-replay on Linux x86-64. Drive it with `replay-record
-  /tmp/trace.bs -- /your/program` then `replay-load`.
+* **Time-travel debugging.** Three independent tiers — reverse stepping
+  over a recorded trace, fork-based checkpoint replay, and clean-room
+  deterministic record-and-replay. See
+  [Time-travel debugging](#time-travel-debugging) below.
 
 * **`#[derive(DebugView)]`.** Annotate your types with a summary template
   (`Person({name}, age {age})`) and the debugger shows that instead of the
@@ -81,6 +81,96 @@ support, DAP for VSCode and any DAP client.)
 
 * **Pure-Rust toolchain.** No LLDB libraries, no Python, no per-platform
   adapter binaries to download.
+
+## Time-travel debugging
+
+Three independent tiers, in increasing cost and durability. Pick the
+one that matches the bug you're hunting.
+
+### Tier 1 — Reverse step over a recorded trace (`bs-replay-driver`)
+
+Loads a Tier 3 trace and walks it backward. The debugger sees the
+same `ptrace`-event surface it would on a live process, so
+breakpoints, watchpoints, and step semantics work as usual — they
+just navigate recorded history rather than driving execution.
+
+* REPL: `rstep` (`rs`) steps the playhead back one event,
+  `rstep-fwd` (`rsf`) steps it forward, `rcontinue` (`rc`) rewinds
+  to the previous breakpoint hit.
+* DAP: `stepBack`, `reverseContinue`, plus custom requests
+  `bs/replayLoad`, `bs/replayJump`, `bs/replayTimeline`,
+  `bs/replayCheckpointList`. The session advertises
+  `supportsStepBack` and `supportsReverseContinue` once a trace is
+  loaded.
+* `replay-doctor` validates a trace, prints per-event-kind
+  histograms, dumps the first N events in readable form, and diffs
+  two traces for the first divergence.
+
+### Tier 2 — Fork-based checkpoint replay (`bs-replay`)
+
+Periodically `fork(2)`s the debuggee at safe points; the children
+sleep, copy-on-write. To inspect state at an earlier PC, attach to
+the nearest checkpoint, set a one-shot breakpoint at the target,
+and let it run forward. Up to 32 checkpoints in a ring; oldest gets
+`SIGKILL` when full.
+
+Linux uses native `fork` + `PTRACE_SEIZE`. macOS uses `mach_vm_remap`
+of writable regions because Mach doesn't expose `fork`-with-ptrace
+cleanly. Best-effort across I/O — fds diverge once either side reads
+or writes — but fine for UI work and pure-compute bugs.
+
+### Tier 3 — Deterministic record-and-replay (`bs-replay-engine`)
+
+Clean-room rr-style record-and-replay. No GPL dependency, no
+external `rr` binary, no Python. Linux x86-64 today; aarch64 is
+scoped, multi-threaded MVP uses single-CPU serialisation.
+
+The trick to near-native record speed is **never single-step the
+program**. We intercept only at non-determinism boundaries:
+
+| Source                    | Mechanism                                  |
+| ------------------------- | ------------------------------------------ |
+| Syscalls                  | `seccomp-bpf` user-notify                  |
+| `RDTSC` / `RDTSCP`        | `PR_SET_TSC = SIGSEGV`, trap, record       |
+| `RDRAND` / `RDSEED`       | `CPUID` mask + `#UD` trap fallback         |
+| `CPUID`                   | seccomp emulate or trap-and-virtualise     |
+| vDSO time fast paths      | vDSO entry-point patching at startup       |
+| `io_uring` SQ/CQ pages    | `userfaultfd` page-fault interception      |
+| Thread interleaving       | single-CPU pinning; PT instruction counts  |
+| Initial env / args / cwd  | full snapshot at record start              |
+
+Targeted overhead: ~1.5–2× single-threaded, ~2× multi-threaded once
+PT-assisted instruction counts replace software single-step between
+context switches. Trace on disk is a directory: `manifest.toml` +
+RFC-8478 zstd-compressed event segments + periodic full snapshots
+for seek without full rescan.
+
+### Live macOS step-back (no trace required)
+
+The DAP session ring-buffers the last 32 stops on macOS — Mach
+writable-region snapshot + per-thread register dump — and rewinds
+the focused thread on `stepBack`. This is on by default for macOS
+debug sessions; no `replay-record` needed. Linux-side equivalent
+goes through Tier 1/2/3.
+
+### Binaries and entry points
+
+| Tool | Purpose | Platform |
+| --- | --- | --- |
+| `replay-record TRACE_DIR -- PROGRAM ...` | Tier 3 recorder | Linux x86-64 |
+| `replay-load TRACE_DIR -- PROGRAM ...` | Tier 3 replay shim (no debugger) | Linux x86-64 |
+| `replay-doctor TRACE_DIR` | Validate / summarise / diff a trace | any |
+| `bs --dap` + `bs/replayLoad` request | Attach BugStalker to a recorded trace | any |
+| REPL `rstep` / `rstep-fwd` / `rcontinue` | Tier 1 reverse stepping at the prompt | any |
+
+`replay-doctor` flags include `--diff OTHER`, `--counts`,
+`--dump-events N`, and `--check-host`. Run `replay-doctor --help` for
+the full list.
+
+> **Not the same thing:** `bs --record FILE` records a *JSON-RPC
+> debugging session* as a runnable `.json5` test script — handy for
+> pinning behaviour after a refactor, unrelated to time travel. The
+> time-travel recorder is `replay-record`.
 
 ## Edit-and-continue (in progress)
 
