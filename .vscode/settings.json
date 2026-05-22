@@ -2,8 +2,6 @@
     "rust-analyzer.linkedProjects": [
         "bugstalker/Cargo.toml",
         "bugstalker/examples/Cargo.toml",
-        "linker/Cargo.toml",
-        "rustc_codegen_cranelift/Cargo.toml",
-        "wasmtime/Cargo.toml"
+        "linker/Cargo.toml"
     ]
 }

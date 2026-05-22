@@ -5,14 +5,7 @@
 	path = linker
 	url = https://github.com/gilescope/wild
 	branch = main
-[submodule "rustc_codegen_cranelift"]
-	path = rustc_codegen_cranelift
-	url = git@github.com:gilescope/rustc_codegen_cranelift.git
 [submodule "bugstalker"]
 	path = bugstalker
 	url = https://github.com/gilescope/BugStalker
 	branch = main
-[submodule "wasmtime"]
-	path = wasmtime
-	url = git@github.com:gilescope/wasmtime.git
-	branch = giles-cranelift-hotswap
