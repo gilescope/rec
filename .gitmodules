@@ -1,6 +1,7 @@
 [submodule "vscode-extension"]
 	path = vscode-extension
 	url = https://github.com/gilescope/vscode-lldb.git
+	branch = main
 [submodule "linker"]
 	path = linker
 	url = https://github.com/gilescope/wild
