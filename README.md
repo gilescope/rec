@@ -188,11 +188,17 @@ the full list.
 
 ## Edit-and-continue (in progress)
 
-The AOT pipeline (cg_clif → wild → BugStalker patch-apply) lands working
-demos on aarch64 macOS today; the Linux runtime demo is the remaining gap.
-The JIT pipeline (cg_clif + `cranelift-hotswap`) has a working warm
-re-codegen path. See [edit_and_continue.md](edit_and_continue.md) for the
+The pipeline is AOT-only: cargo (any codegen backend — stock cg_clif or LLVM)
+→ wild (incremental link with `--emit-patch`) → BugStalker (patch-apply over
+ptrace / Mach). Working demos on aarch64 macOS today; the Linux runtime demo
+is the remaining gap. See [edit_and_continue.md](edit_and_continue.md) for the
 component-by-component status.
+
+An earlier JIT pipeline (cg_clif + a bespoke `cranelift-hotswap` crate) was
+prototyped on the `giles-cranelift-hotswap` branch of
+[gilescope/wasmtime](https://github.com/gilescope/wasmtime/pull/1) — design
+worked, CI was green, but the AOT pipeline subsumes the use case so the
+additional fork wasn't worth carrying. Dropped 2026-05-22.
 
 The VSCode extension's edit-and-continue watcher (file-change → rebuild via
 wild + `--emit-patch` → DAP custom request → process-patched, top frame
@@ -205,10 +211,8 @@ documents the launch-config knobs.
 
 | Path | Repository | Purpose | Branch |
 | --- | --- | --- | --- |
-| `rustc_codegen_cranelift` | `git@github.com:gilescope/rustc_codegen_cranelift.git` | cg_clif edit-and-continue JIT integration | `main` |
-| `wasmtime` | `git@github.com:gilescope/wasmtime.git` | `cranelift-hotswap` implementation | `giles-cranelift-hotswap` |
-| `linker` | `https://github.com/gilescope/wild` | Wild linker AOT patch emission | `giles-mac` |
-| `bugstalker` | `https://github.com/gilescope/BugStalker` | Debugger patch application and reverse/debugger work | `giles-rust-visuals` |
+| `linker` | `https://github.com/gilescope/wild` | Wild linker AOT patch emission | `main` |
+| `bugstalker` | `https://github.com/gilescope/BugStalker` | Debugger patch application and reverse/debugger work | `main` |
 | `vscode-extension` | `https://github.com/gilescope/vscode-lldb.git` | VSCode debug adapter — DAP shim + edit-and-continue watcher | pinned commit |
 
 `enc-patcher` was an early same-process patching spike and is intentionally not
