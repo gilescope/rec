@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions: {}
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rec-gate:
+    name: rec-gate (integration at rec-pinned shas)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false  # we read submodule shas from the index, not the tree
+
+      - name: Read rec-pinned submodule shas
+        id: shas
+        run: |
+          {
+            echo "bs=$(git ls-tree HEAD bugstalker | awk '{print $3}')"
+            echo "wild=$(git ls-tree HEAD linker | awk '{print $3}')"
+            echo "ext=$(git ls-tree HEAD vscode-extension | awk '{print $3}')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install earth
+        uses: EarthBuild/actions-setup@5d323543fa1d7b963384b46b2cbaef0bf6d88216  # v2.1.0
+        with:
+          version: v0.8.17
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run rec integration gate
+        run: |
+          earth --ci -P +rec-gate \
+            --BS_REF=${{ steps.shas.outputs.bs }} \
+            --WILD_REF=${{ steps.shas.outputs.wild }} \
+            --EXT_REF=${{ steps.shas.outputs.ext }}
+
+  # Full sweep — every fork's own CI re-run at the rec-pinned sha plus
+  # the rec-level integration. Heavy; runs on push to main and on
+  # workflow_dispatch only, not on every PR.
+  rec-all:
+    name: rec-all (full sweep at rec-pinned shas)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Read rec-pinned submodule shas
+        id: shas
+        run: |
+          {
+            echo "bs=$(git ls-tree HEAD bugstalker | awk '{print $3}')"
+            echo "wild=$(git ls-tree HEAD linker | awk '{print $3}')"
+            echo "ext=$(git ls-tree HEAD vscode-extension | awk '{print $3}')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install earth
+        uses: EarthBuild/actions-setup@5d323543fa1d7b963384b46b2cbaef0bf6d88216  # v2.1.0
+        with:
+          version: v0.8.17
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run full sweep
+        run: |
+          earth --ci -P +all \
+            --BS_REF=${{ steps.shas.outputs.bs }} \
+            --WILD_REF=${{ steps.shas.outputs.wild }} \
+            --EXT_REF=${{ steps.shas.outputs.ext }}
