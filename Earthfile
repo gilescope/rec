@@ -180,3 +180,43 @@ all:
     BUILD +ext-own-gate
     BUILD +wild-own-gate
     BUILD +rec-gate
+
+# ---------------------------------------------------------------------
+# Dev install (macOS).
+# ---------------------------------------------------------------------
+#
+# One command to put a working debugger + editor integration on the
+# host. Unlike the CI gates above (which pull each fork from its pinned
+# GitHub ref), this installs from the LOCAL submodule checkouts, so your
+# uncommitted/unpushed work lands in the editor.
+#
+#   1. bugstalker `bs` — `cargo install` (perf overlay on by default) +
+#      adhoc codesign with the `com.apple.security.cs.debugger`
+#      entitlement, delegated to bugstalker's own +install-darwin. The
+#      entitlement is what lets the perf PC-sampler call task_for_pid.
+#   2. the VS Code extension — packaged to a .vsix (+vsix) and installed
+#      via the VS Code CLI with --force (overwrites any prior copy).
+#
+# LOCALLY throughout: needs host cargo, codesign and the `code` CLI.
+# The `code` shell command must be on PATH (VS Code Command Palette →
+# "Shell Command: Install 'code' command in PATH") or installed in the
+# standard app-bundle location.
+#
+#   earth +install-darwin
+install-darwin:
+    LOCALLY
+    RUN test "$(uname)" = Darwin || \
+        { echo "+install-darwin: macOS only (host is $(uname))"; exit 1; }
+    # 1) bs — build (perf default) + codesign + `bugstalker` symlink.
+    BUILD ./bugstalker+install-darwin
+    # 2) extension — produce the .vsix (containerised, reproducible).
+    #    +vsix SAVE ARTIFACT AS LOCAL lands at vscode-extension/build/.
+    BUILD ./vscode-extension+vsix
+    # 3) install the .vsix. ~/code is a user wrapper, not the CLI, so
+    #    prefer the app-bundle binary and fall back to PATH `code`.
+    RUN CODE="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"; \
+        [ -x "$CODE" ] || CODE="$(command -v code 2>/dev/null || true)"; \
+        { [ -n "$CODE" ] && [ -x "$CODE" ]; } || \
+            { echo "+install-darwin: VS Code 'code' CLI not found (app bundle or PATH); install it via Command Palette → \"Shell Command: Install 'code' command in PATH\""; exit 1; }; \
+        "$CODE" --install-extension vscode-extension/build/vscode-bugstalker.vsix --force
+    RUN echo "+install-darwin: bs (perf, cs.debugger-signed) + extension installed — reload the VS Code window (Cmd-R) to activate."
