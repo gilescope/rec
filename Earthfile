@@ -208,10 +208,15 @@ install-darwin:
     RUN test "$(uname)" = Darwin || \
         { echo "+install-darwin: macOS only (host is $(uname))"; exit 1; }
     # 1) bs — build (perf default) + codesign + `bugstalker` symlink.
-    BUILD ./bugstalker+install-darwin
-    # 2) extension — produce the .vsix (containerised, reproducible).
+    # 2) extension — produce the .vsix (containerised, reproducible);
     #    +vsix SAVE ARTIFACT AS LOCAL lands at vscode-extension/build/.
-    BUILD ./vscode-extension+vsix
+    # BUILD is async in earthly, so both go in a WAIT block: without it
+    # the install RUN below races ahead and reinstalls the *previous*
+    # run's stale .vsix before this one finishes writing.
+    WAIT
+        BUILD ./bugstalker+install-darwin
+        BUILD ./vscode-extension+vsix
+    END
     # 3) install the .vsix. ~/code is a user wrapper, not the CLI, so
     #    prefer the app-bundle binary and fall back to PATH `code`.
     RUN CODE="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"; \
