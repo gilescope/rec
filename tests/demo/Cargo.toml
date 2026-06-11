@@ -1,0 +1,19 @@
+[package]
+name = "demo"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "demo"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 0
+debug = true
+lto = false
+codegen-units = 1
+incremental = false

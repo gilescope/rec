@@ -1,0 +1,12 @@
+// Minimal `bs --test` smoke driver. Real scripts live in
+// bugstalker/tests/scripts/*.json5; this one just proves the bs
+// binary the rec-level CI built can spawn the demo, parse a script,
+// set a breakpoint by symbol, and run to it.
+//
+// Wire format: one JSON-RPC request per line. JSON5 comments + trailing
+// commas allowed. Real method names from bs --describe-commands; see
+// bugstalker/doc/scripting/usage.md.
+
+{ method: "break.set", params: { at: "compute" } }
+{ method: "run" }
+{ method: "bt" }

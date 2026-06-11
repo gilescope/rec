@@ -174,6 +174,15 @@ the full list.
 
 ## Potential future work
 
+* **Variables-pane refresh** — a five-layer visual vocabulary turning the
+  variables window into a glance-readable summary of *runtime access state*,
+  *mutability*, *storage class* (stack / register / static / TLS / heap),
+  *stack health* (frame size, recursion, overflow risk), and *payload-vs-padding
+  waste*. All five derive from data the debugger already has — DWARF, ELF
+  program headers, CFI we parse for unwinding. See
+  [variables-view.md](variables-view.md) for the full spec, user-facing
+  reference, and landing order.
+
 * **Loom transcript viewer.** When a `loom::model` test finds a failing
   schedule, loom writes a checkpoint file (`LOOM_CHECKPOINT_FILE`) plus a
   text trace of the offending interleaving. Today the user reads the
