@@ -124,9 +124,12 @@ test-protocol-contract:
     # rejects raw shas which the workflow passes).
     RUN git clone https://github.com/gilescope/vscode-lldb /ext && \
         cd /ext && git checkout ${EXT_REF}
-    RUN grep -rq 'bs/encApplyPatch' /ext/extension \
-        || (echo "extension no longer references bs/encApplyPatch — the EnC contract is broken" && exit 1)
-    RUN echo "[protocol-contract] ok — scripting schema present, apply-patch reachable, extension still speaks bs/encApplyPatch"
+    # NB: the wire name is bs/applyPatch (yadap/session/mod.rs dispatch,
+    # editContinue.ts customRequest) — bs/encApplyPatch only ever existed in
+    # comments, which is what this gate was first (wrongly) written against.
+    RUN grep -rq 'bs/applyPatch' /ext/extension \
+        || (echo "extension no longer references bs/applyPatch — the EnC contract is broken" && exit 1)
+    RUN echo "[protocol-contract] ok — scripting schema present, apply-patch reachable, extension still speaks bs/applyPatch"
 
 # 2. bs --test smoke against a tiny scripted session + tiny debuggee.
 #
